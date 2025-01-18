@@ -6,8 +6,11 @@ import pickle
 import time
 import inputs
 from inputs import INPUTS
+from train import data_transform, Net, DATA_DIR, MODEL_FILE
 from pyglet.window import key
 from environment import Game
+import os
+import torch
 
 import gymnasium as gym
 import numpy as np
@@ -15,7 +18,7 @@ import numpy as np
 DATA_DIR = 'data'
 DATA_FILE = 'data.gzip'
 
-def rollout(env:gym.Env):
+def rollout(env:gym.Env, model:Net):
     global restart_train, agent_action, exit_train, pause_train
     agent_action = np.zeros(len(INPUTS))
     exit_train = False
@@ -34,29 +37,36 @@ def rollout(env:gym.Env):
     state = env.reset()
     total_reward = 0
     episode = 1
+    inputs.toggle = True
     while 1:
+        done = False
         env.render()
 
-        agent_action = inputs.actions
-        exit_train = inputs.stop_action
-        
-        a = np.copy(agent_action)
-        old_state = state
+        if inputs.toggle:
+            # Bot
+           # _state = np.moveaxis(state, 2, 0)  # channel first image
+            _state = state
+            # numpy to tensor
+            _state = torch.from_numpy(np.flip(_state, axis=0).copy())
+            _state = data_transform(state)  # apply transformations
+            _state = _state.unsqueeze(0)  # add additional dimension
+            # forward
+            with torch.set_grad_enabled(False):
+                outputs = model(_state)[0]
 
-        state, reward, done, info = env.step(agent_action)
+            state, _, done, _ = env.step(outputs)  # one step
+            # Clear actions 
+            inputs.reset()
+        else:
+            agent_action = inputs.actions        
+            a = np.copy(agent_action)
+            old_state = state
 
-        observations.append((old_state, a, state, reward, done))
+            state, reward, done, info = env.step(agent_action)
 
-        total_reward += reward
+            observations.append((old_state, a, state, reward, done))
 
-        # if exit_train:
-        #     env.close()
-        #     return
-
-        if restart_train:
-            restart_train = False
-            state = env.reset()
-            continue
+            total_reward += reward
 
         if done:
                 
@@ -86,7 +96,11 @@ def rollout(env:gym.Env):
 
 
 if __name__ == '__main__':
+    m = Net()
+    m.load_state_dict(torch.load(os.path.join(DATA_DIR, MODEL_FILE)))
+    print("loaded")
+    m.eval()
     env = Game()
     env.reset()
-    env.render()
-    rollout(env)
+    #env.render()
+    rollout(env, m)

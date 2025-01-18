@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from inputs import INPUTS
+
 BATCH_SIZE = 32  # mb size
 EPOCHS = 30  # number of epochs
 TRAIN_VAL_SPLIT = 0.85  # train/val ratio
@@ -19,19 +21,13 @@ DATA_DIR = 'data'
 DATA_FILE = 'data.gzip'
 MODEL_FILE = 'model.pt'
 
-# Set of all Actions
-actions_set = np.array([[0, 0, 0],  # no action
-                     [-1, 0, 0],  # left
-                     [1, 0, 0],  # right
-                     [0, 1, 0],  # acceleration
-                     [0, 0, 1], ])  # break
-
 # transformations for training/testing
 data_transform = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Grayscale(3),
-    transforms.Pad((12, 12, 12, 0)),
-    transforms.CenterCrop(84),
+    #transforms.Grayscale(3),
+    transforms.Resize((90,90)),
+    #transforms.Pad((12, 12, 12, 0)),
+    #transforms.CenterCrop(90),
     transforms.ToTensor(),
     transforms.Normalize((0,), (1,)),
 ])
@@ -58,22 +54,24 @@ def read_data():
         lst = list(data[i])
         if (type(lst[0]) is tuple):
             lst[0] = lst[0][0]
-        d.append(lst)  
+        if lst[1].sum() > 0:
+            d.append(lst)  
     data = d
 
     states, actions, _, _, _ = map(np.array, zip(*data))
-    act_classes = np.full((len(actions)), -1, dtype=int)
-    for i, a in enumerate(actions_set):
-        act_classes[np.all(actions == a, axis=1)] = i
+    act_classes = actions
+    # act_classes = np.full((len(actions)), -1, dtype=int)
+    # for i, a in enumerate(actions_set):
+    #     act_classes[np.all(actions == a, axis=1)] = i
 
-    # drop unsupported actions
-    states = np.array(states)
-    states = states[act_classes != -1]
-    act_classes = act_classes[act_classes != -1]
+    # # drop unsupported actions
+    # states = np.array(states)
+    # states = states[act_classes != -1]
+    # act_classes = act_classes[act_classes != -1]
 
-    for i, a in enumerate(actions_set):
-        print("Actions of type {}: {}"
-              .format(str(a), str(act_classes[act_classes == i].size)))
+    # for i, a in enumerate(actions_set):
+    #     print("Actions of type {}: {}"
+    #           .format(str(a), str(act_classes[act_classes == i].size)))
 
     print("Total transitions: ", len(states) ,str(len(act_classes)), act_classes[0], act_classes[1], act_classes[2])
     
@@ -84,7 +82,7 @@ def create_datasets():
 
     x, y = read_data()
 
-    x = np.moveaxis(x, 3, 1)  # channel first (torch requirement)
+    #x = np.moveaxis(x, 3, 1)  # channel first (torch requirement)
 
     # train dataset
     x_train = x[:int(len(x) * TRAIN_VAL_SPLIT)]
@@ -128,7 +126,7 @@ def create_ex_datasets():
 
     x, y = read_data()
 
-    x = np.moveaxis(x, 3, 1)
+    #x = np.moveaxis(x, 3, 1)
     x_ex = x[:2]
     y_ex = y[:2]
 
@@ -148,7 +146,7 @@ def Net():
             return x.view(x.size()[0], -1)
 
     model = torch.nn.Sequential(
-        torch.nn.Conv2d(3, 32, 8, 4),
+        torch.nn.Conv2d(1, 32, 5, 3),
         torch.nn.BatchNorm2d(32),
         torch.nn.ELU(),
         torch.nn.Dropout2d(0.5),
@@ -159,13 +157,13 @@ def Net():
         torch.nn.Conv2d(64, 64, 3, 1),
         torch.nn.ELU(),
         Flatten(),
-        torch.nn.BatchNorm1d(64 * 7 * 7),
+        torch.nn.BatchNorm1d(64 * 11 * 11),
         torch.nn.Dropout(),
-        torch.nn.Linear(64 * 7 * 7, 120),
+        torch.nn.Linear(64 * 11 * 11, 120),
         torch.nn.ELU(),
         torch.nn.BatchNorm1d(120),
         torch.nn.Dropout(),
-        torch.nn.Linear(120, len(actions_set)),
+        torch.nn.Linear(120, len(INPUTS)),
     )
 
     return model
@@ -177,7 +175,7 @@ def train(model):
     :param model: the network
     """
     loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=0.005)
     train_loader, val_order = create_datasets()  # read datasets
 
     # train
@@ -202,12 +200,13 @@ def train_epoch(model, loss_function, optimizer, data_loader):
     # iterate over the training data
     for i, (inputs, labels) in enumerate(data_loader):
 
-        # inputs:torch.Tensor = inputs
+        inputs:torch.Tensor = inputs
+
         # for data in np.moveaxis(np.array(inputs), 1, 3):
-        #     plt.imshow(data, cmap='gray')
-        #     plt.show(block=False)
-        #     plt.pause(0.001)
-        #     plt.draw()
+            # plt.imshow(data, cmap='gray')
+            # plt.show(block=False)
+            # plt.pause(0.001)
+            # plt.draw()
 
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -215,8 +214,7 @@ def train_epoch(model, loss_function, optimizer, data_loader):
         with torch.set_grad_enabled(True):
             # forward
             outputs = model(inputs)
-            # print(outputs.size(), inputs.size())
-            _, predictions = torch.max(outputs, 1)
+
             loss = loss_function(outputs, labels)
 
             # backward
@@ -225,7 +223,7 @@ def train_epoch(model, loss_function, optimizer, data_loader):
 
         # statistics
         current_loss += loss.item() * inputs.size(0)
-        current_acc += torch.sum(predictions == labels.data)
+        current_acc += torch.sum((outputs - labels).pow(2).sum().sqrt()/labels.size(1))
 
     total_loss = current_loss / len(data_loader.dataset)
     total_acc = current_acc.double() / len(data_loader.dataset)
@@ -251,7 +249,7 @@ def test(model, loss_function, data_loader):
 
         # statistics
         current_loss += loss.item() * inputs.size(0)
-        current_acc += torch.sum(predictions == labels.data)
+        current_acc += torch.sum((outputs - labels).pow(2).sum().sqrt()/labels.size(1))
 
     total_loss = current_loss / len(data_loader.dataset)
     total_acc = current_acc.double() / len(data_loader.dataset)
