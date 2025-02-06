@@ -44,15 +44,18 @@ def rollout(env:gym.Env, model:Net):
 
         if inputs.toggle:
             # Bot
-           # _state = np.moveaxis(state, 2, 0)  # channel first image
-            _state = state
+            state = np.moveaxis(state, 2, 0)  # channel first image
             # numpy to tensor
-            _state = torch.from_numpy(np.flip(_state, axis=0).copy())
-            _state = data_transform(state)  # apply transformations
-            _state = _state.unsqueeze(0)  # add additional dimension
+            #state = torch.from_numpy(np.flip(state, axis=0).copy())
+            state = torch.from_numpy(state)
+
+            state = data_transform(state)  # apply transformations
+            state = state.unsqueeze(0)  # add additional dimension
+            state = state.double()
+
             # forward
             with torch.set_grad_enabled(False):
-                outputs = model(_state)[0]
+                outputs = torch.sigmoid(model(state)[0]).numpy()#model(state)[0].numpy()#
 
             state, _, done, _ = env.step(outputs)  # one step
             # Clear actions 

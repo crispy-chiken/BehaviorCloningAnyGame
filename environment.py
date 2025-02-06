@@ -16,19 +16,21 @@ class Game(Env):
         # Setup spaces
         self.observation_space = Box(low=0, high=255, shape=(1,90,160), dtype=np.uint8)
         self.action_space = Discrete(len(INPUTS))
-        self.keyboard = pynput.keyboard.Controller()
         self.training = training
         
     def step(self, action):
-        action[action > 0] = 1
-        action[action < 0] = 0
-        if not self.training:
-            for i in range(len(action)):
-                if action[i] > 0:
-                    self.keyboard.press(INPUTS[i])
-                else:
-                    self.keyboard.release(INPUTS[i])
-        print(action)
+        # action[action >= 0.9] = 1
+        # action[action < 0.9] = 0
+        action = np.round(action, 2)
+
+        if inputs.toggle:
+            if not self.training:
+                for i in range(len(action)):
+                    if action[i] > 0.5:
+                        inputs.input_board.press(INPUTS[i])
+                    else:
+                        inputs.input_board.release(INPUTS[i])
+        print(str(action) + " " + str(inputs.toggle))
         done = inputs.stop_action
         #print(done)
         observation = self.get_observation()
@@ -44,16 +46,17 @@ class Game(Env):
     def render(self):
         obs = self.get_observation()
         #plt.imshow(cv2.cvtColor(obs, cv2.COLOR_GRAY2BGR))
-        #plt.show(block = False)
-        #plt.pause(0.001)
-        #plt.show()
+        # plt.imshow(obs)
+        # plt.show(block = False)
+        # plt.pause(0.001)
+        # plt.show()
          
     def close(self):
         pass
     
     def get_observation(self):
-        raw = grab.grab_screen()
-        gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, (160,90))
-        # channel = np.reshape(resized, (1,90,160))
-        return resized
+        img = grab.grab_screen()
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cv2.resize(img, (160,90))
+        #img = np.reshape(img, (3,90,160))
+        return img

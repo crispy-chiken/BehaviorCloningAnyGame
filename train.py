@@ -10,22 +10,26 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torcheval.metrics import MulticlassAccuracy
+from model import Net
 
 from inputs import INPUTS
 
 BATCH_SIZE = 32  # mb size
-EPOCHS = 30  # number of epochs
+EPOCHS = 10  # number of epochs
 TRAIN_VAL_SPLIT = 0.85  # train/val ratio
 
 DATA_DIR = 'data'
 DATA_FILE = 'data.gzip'
 MODEL_FILE = 'model.pt'
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 # transformations for training/testing
 data_transform = transforms.Compose([
     transforms.ToPILImage(),
     #transforms.Grayscale(3),
-    transforms.Resize((90,90)),
+    transforms.Resize((128,128)),
     #transforms.Pad((12, 12, 12, 0)),
     #transforms.CenterCrop(90),
     transforms.ToTensor(),
@@ -46,15 +50,16 @@ def read_data():
     with gzip.open(os.path.join(DATA_DIR, DATA_FILE), 'rb') as f:
         data = pickle.load(f)
 
-    random.shuffle(data)
+    #random.shuffle(data)
 
     # Fix for error when the env is init, it returns a tuple with observation it
     d = list()
     for i in range(len(data)):
         lst = list(data[i])
-        if (type(lst[0]) is tuple):
-            lst[0] = lst[0][0]
-        if lst[1].sum() > 0:
+        #print( lst[0].shape())
+        # if (type(lst[0]) is tuple):
+        #     lst[0] = lst[0][0]
+        if lst[1].sum() > 0: # Only accept where action count is > 0
             d.append(lst)  
     data = d
 
@@ -82,7 +87,7 @@ def create_datasets():
 
     x, y = read_data()
 
-    #x = np.moveaxis(x, 3, 1)  # channel first (torch requirement)
+    x = np.moveaxis(x, 3, 1)  # channel first (torch requirement)
 
     # train dataset
     x_train = x[:int(len(x) * TRAIN_VAL_SPLIT)]
@@ -94,7 +99,7 @@ def create_datasets():
 
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=BATCH_SIZE,
-                                               shuffle=True,
+                                               shuffle=False,
                                                num_workers=2)
 
     # test dataset
@@ -126,56 +131,30 @@ def create_ex_datasets():
 
     x, y = read_data()
 
-    #x = np.moveaxis(x, 3, 1)
-    x_ex = x[:2]
-    y_ex = y[:2]
+    x = np.moveaxis(x, 3, 1)
+    x_ex = x#[:2]
+    y_ex = y#[:2]
 
     ex_set = TensorDatasetTransforms(
         torch.tensor(x_ex),
         torch.tensor(y_ex))
 
-    ex_loader = torch.utils.data.DataLoader(ex_set)
+    ex_loader = torch.utils.data.DataLoader(ex_set, shuffle=True)
 
     return ex_loader
 
-def Net():
 
-    class Flatten(nn.Module):
-
-        def forward(self, x):
-            return x.view(x.size()[0], -1)
-
-    model = torch.nn.Sequential(
-        torch.nn.Conv2d(1, 32, 5, 3),
-        torch.nn.BatchNorm2d(32),
-        torch.nn.ELU(),
-        torch.nn.Dropout2d(0.5),
-        torch.nn.Conv2d(32, 64, 4, 2),
-        torch.nn.BatchNorm2d(64),
-        torch.nn.ELU(),
-        torch.nn.Dropout2d(0.5),
-        torch.nn.Conv2d(64, 64, 3, 1),
-        torch.nn.ELU(),
-        Flatten(),
-        torch.nn.BatchNorm1d(64 * 11 * 11),
-        torch.nn.Dropout(),
-        torch.nn.Linear(64 * 11 * 11, 120),
-        torch.nn.ELU(),
-        torch.nn.BatchNorm1d(120),
-        torch.nn.Dropout(),
-        torch.nn.Linear(120, len(INPUTS)),
-    )
-
-    return model
-
-
-def train(model):
+def train(model:nn.Module):
     """
     Training main method
     :param model: the network
     """
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.005)
+    #loss_function = nn.MSELoss() #
+    #loss_function = nn.CrossEntropyLoss()
+    #loss_function = nn.MultiLabelMarginLoss()
+    loss_function = nn.BCEWithLogitsLoss()
+    #optimizer = optim.Adagrad(model.parameters(), lr= 0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
     train_loader, val_order = create_datasets()  # read datasets
 
     # train
@@ -196,34 +175,45 @@ def train_epoch(model, loss_function, optimizer, data_loader):
 
     current_loss = 0.0
     current_acc = 0
+    metric = MulticlassAccuracy(num_classes=2)
 
     # iterate over the training data
     for i, (inputs, labels) in enumerate(data_loader):
 
         inputs:torch.Tensor = inputs
 
+        # Show image
         # for data in np.moveaxis(np.array(inputs), 1, 3):
-            # plt.imshow(data, cmap='gray')
-            # plt.show(block=False)
-            # plt.pause(0.001)
-            # plt.draw()
+        #     plt.imshow(data, cmap='gray')
+        #     plt.show(block=False)
+        #     plt.pause(0.001)
+        #     plt.draw()
 
         # zero the parameter gradients
         optimizer.zero_grad()
 
         with torch.set_grad_enabled(True):
             # forward
-            outputs = model(inputs)
-
+            outputs = model(inputs.to(device).double()).to('cpu')
             loss = loss_function(outputs, labels)
 
             # backward
             loss.backward()
             optimizer.step()
-
+        
+        outputs = torch.sigmoid(outputs)
+        outputs[outputs >= 0.9] = 1
+        outputs[outputs < 0.9] = 0
         # statistics
+        # outputs[outputs >= 0.9] = 1
+        # outputs[outputs < 0.9] = 0
+        # for o,l in zip(outputs, labels):
+        #     metric.update(o, l)
+        #     current_acc += metric.compute()#torch.sum(outputs == labels.data)
+        # print(outputs * labels)
+        # print(torch.sum(labels))
+        current_acc += torch.sum(outputs * labels) / (torch.sum(labels) + torch.sum(outputs)) * 2
         current_loss += loss.item() * inputs.size(0)
-        current_acc += torch.sum((outputs - labels).pow(2).sum().sqrt()/labels.size(1))
 
     total_loss = current_loss / len(data_loader.dataset)
     total_acc = current_acc.double() / len(data_loader.dataset)
@@ -233,7 +223,7 @@ def train_epoch(model, loss_function, optimizer, data_loader):
 
 def test(model, loss_function, data_loader):
     """Test over the whole dataset"""
-
+    metric = MulticlassAccuracy(num_classes=2)
     model.eval()  # set model in evaluation mode
 
     current_loss = 0.0
@@ -243,13 +233,18 @@ def test(model, loss_function, data_loader):
     for i, (inputs, labels) in enumerate(data_loader):
         # forward
         with torch.set_grad_enabled(False):
-            outputs = model(inputs)
+            outputs = model(inputs.to(device).double()).to('cpu')
             _, predictions = torch.max(outputs, 1)
             loss = loss_function(outputs, labels)
 
-        # statistics
+        outputs = torch.sigmoid(outputs)
+        outputs[outputs >= 0.9] = 1
+        outputs[outputs < 0.9] = 0
+        # for o,l in zip(outputs, labels):
+        #     metric.update(o, l)
+        #     current_acc += metric.compute()#torch.sum(outputs == labels.data)
+        current_acc +=  torch.sum(outputs * labels) / torch.sum(labels)
         current_loss += loss.item() * inputs.size(0)
-        current_acc += torch.sum((outputs - labels).pow(2).sum().sqrt()/labels.size(1))
 
     total_loss = current_loss / len(data_loader.dataset)
     total_acc = current_acc.double() / len(data_loader.dataset)
@@ -261,6 +256,7 @@ def test(model, loss_function, data_loader):
 if __name__ == '__main__':
     print('Training...')
     m = Net()
+    m.to(device)
     m.eval()
     train(m)
     print('Training Done!')
@@ -269,6 +265,26 @@ if __name__ == '__main__':
     print('Outputs of Neural Network are as follows:')
 
     for i, (input, label) in enumerate(x_ex):
-        print("Example:",i+1)
-        output = m(input)
-        print(output.tolist()[0])
+
+        for data in input:
+            
+            # data = np.moveaxis(data, 2, 0)  # channel first image
+            # #_state = state
+            # # numpy to tensor
+            # data = torch.from_numpy(np.flip(data, axis=0).copy())
+            d = data#data_transform(data)  # apply transformations
+            d = d.unsqueeze(0)  # add additional dimension
+            d = d.double()
+        
+            print("Example:",i+1)
+            output = m(d.to(device).double()).to('cpu')
+            output = torch.sigmoid(output)
+            #output = torch.nn.functional.softmax(output)
+            output = torch.round(output, decimals=2)
+            print(output)
+            print(label)
+
+            d = np.moveaxis(np.array(data), 0, 2)
+            plt.imshow(d)#, cmap='gray')
+            plt.draw()
+            plt.show()
