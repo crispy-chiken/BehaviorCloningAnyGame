@@ -1,36 +1,18 @@
-# Behaviour Cloning
+# Behaviour Cloning Any Game
 
-## Setup
+## Set up
 
-To install Anaconda follow the instructions in the following webpage:  
-https://www.digitalocean.com/community/tutorials/how-to-install-anaconda-on-ubuntu-18-04-quickstart
+* Requirements are in requirements.txt
 
-Create a conda environment:  
-```
-$ conda create --name behaviour_clone  
-```
-Switch to the newly create environment (you will notice the name of the environment on the command line in the extreme left):  
-```
-$ conda activate behaviour_clone  
-```
+# Training
 
-Once in the desired environment install the following packages:  
-```
-$ conda install nb_conda_kernels  
-```
+* Set up the game inputs in input.py. 
+* Run the training through manual_train.py. End the program by pressing ENTER. Cancel the training by pressing ESC.
+* Train the model by running train.py
 
-Install OpenAI Gym (while in the environment):  
-```
-$ pip install gym==0.18.3 
-```
+# Running
 
-Install Matplotlib (while in the environment):
-```
-$ conda install matplotlib
-```
-
-
-## Videos
-* [Manual Expert Training](https://www.youtube.com/watch?v=XB2HAFfluEM)
-
-* [Final Test Video](https://www.youtube.com/watch?v=ZWKFebktNMs)
+* Run manual_train_and_ai.py to run the program
+* Take over the program at any time using the [~] key.
+* End the program by pressing ENTER. Cancel the training by pressing ESC.
+* Ending the program through ENTER will save all manual take over controls.

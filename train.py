@@ -202,8 +202,8 @@ def train_epoch(model, loss_function, optimizer, data_loader):
             optimizer.step()
         
         outputs = torch.sigmoid(outputs)
-        outputs[outputs >= 0.9] = 1
-        outputs[outputs < 0.9] = 0
+        outputs[outputs >= 0.5] = 1
+        outputs[outputs < 0.5] = 0
         # statistics
         # outputs[outputs >= 0.9] = 1
         # outputs[outputs < 0.9] = 0
@@ -238,8 +238,8 @@ def test(model, loss_function, data_loader):
             loss = loss_function(outputs, labels)
 
         outputs = torch.sigmoid(outputs)
-        outputs[outputs >= 0.9] = 1
-        outputs[outputs < 0.9] = 0
+        outputs[outputs >= 0.5] = 1
+        outputs[outputs < 0.5] = 0
         # for o,l in zip(outputs, labels):
         #     metric.update(o, l)
         #     current_acc += metric.compute()#torch.sum(outputs == labels.data)

@@ -3,48 +3,48 @@ from pynput import keyboard
 import numpy as np
 
 # Monster hunter
-# INPUTS = np.array([
-#     # Move
-#     keyboard.KeyCode.from_char('w'),
-#     keyboard.KeyCode.from_char('a'),
-#     keyboard.KeyCode.from_char('s'),
-#     keyboard.KeyCode.from_char('d'),
+INPUTS = np.array([
+    # Move
+    keyboard.KeyCode.from_char('w'),
+    keyboard.KeyCode.from_char('a'),
+    keyboard.KeyCode.from_char('s'),
+    keyboard.KeyCode.from_char('d'),
 
-#     # Attacks
-#     keyboard.KeyCode.from_char('i'),
-#     keyboard.KeyCode.from_char('p'),
-#     keyboard.Key.shift_l,
-#     keyboard.Key.space,
+    # Attacks
+    keyboard.KeyCode.from_char('i'),
+    keyboard.KeyCode.from_char('p'),
+    keyboard.Key.shift_l,
+    keyboard.Key.space,
 
-#     # Camera
-#     keyboard.KeyCode.from_char('o'),
-#     keyboard.KeyCode.from_char('k'),
-#     keyboard.KeyCode.from_char('l'),
-#     keyboard.KeyCode.from_char(';'),
+    # Camera
+    keyboard.KeyCode.from_char('o'),
+    keyboard.KeyCode.from_char('k'),
+    keyboard.KeyCode.from_char('l'),
+    keyboard.KeyCode.from_char(';'),
 
-#     # Items
-#     keyboard.KeyCode.from_char('1'),
-#     keyboard.KeyCode.from_char('2'),
-#     keyboard.KeyCode.from_char('3'),
-#     keyboard.KeyCode.from_char('4'),
+    # Items
+    keyboard.KeyCode.from_char('1'),
+    keyboard.KeyCode.from_char('2'),
+    keyboard.KeyCode.from_char('3'),
+    keyboard.KeyCode.from_char('4'),
 
-#     # Others
-#     keyboard.KeyCode.from_char('r'), #run
-#     keyboard.KeyCode.from_char('c'), # Re target
-#     keyboard.Key.alt_l, # Recenter camera
-# ])
+    # Others
+    keyboard.KeyCode.from_char('r'), #run
+    keyboard.KeyCode.from_char('c'), # Re target
+    keyboard.Key.alt_l, # Recenter camera
+])
 
 #Rabbit and steel
-INPUTS = np.array([
-    keyboard.Key.left,
-    keyboard.Key.right,
-    keyboard.Key.up,
-    keyboard.Key.down,
-    keyboard.KeyCode.from_char('z'),
-    keyboard.KeyCode.from_char('x'),
-    keyboard.KeyCode.from_char('c'),
-    keyboard.KeyCode.from_char('v'),
-])
+# INPUTS = np.array([
+#     keyboard.Key.left,
+#     keyboard.Key.right,
+#     keyboard.Key.up,
+#     keyboard.Key.down,
+#     keyboard.KeyCode.from_char('z'),
+#     keyboard.KeyCode.from_char('x'),
+#     keyboard.KeyCode.from_char('c'),
+#     keyboard.KeyCode.from_char('v'),
+# ])
 
 actions = np.zeros(len(INPUTS))
 stop_action = False
